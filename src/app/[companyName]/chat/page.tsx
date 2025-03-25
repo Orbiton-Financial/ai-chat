@@ -7,8 +7,11 @@ import React, {
   FormEvent,
   useCallback,
 } from "react";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+import { Plus } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { AutoSuggestions } from "./components/AutoSuggestions";
 import { TypingIndicator } from "./components/TypingIndicator";
@@ -24,7 +27,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const defaultSuggestions = [
-  "Recent drill results?",
+  "Recentt drill results?",
   "Upcoming catalysts?",
   "Accretive acquisitions?",
 ];
@@ -37,19 +40,25 @@ export default function ChatPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [assistantTyping, setAssistantTyping] = useState(false);
+
   const params = useParams();
   const companyName = params.companyName as string;
+
   const [company, setCompany] = useState<{
     openai_api_key: string;
     assistant_id: string;
     default_suggestions: string[];
   } | null>(null);
 
+  // State for controlling suggestions
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  //--------------------------------------------------
+  // 1. Load Company Config
+  //--------------------------------------------------
   useEffect(() => {
     const fetchCompanyConfig = async () => {
       try {
@@ -76,14 +85,15 @@ export default function ChatPage() {
     fetchCompanyConfig();
   }, [companyName]);
 
+  //--------------------------------------------------
+  // 2. Chat Utility Functions
+  //--------------------------------------------------
   const handleChatSelect = useCallback(async (chatId: number) => {
     setLoading(true);
     try {
       const res = await fetch("/api/loadChat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId }),
       });
 
@@ -92,6 +102,7 @@ export default function ChatPage() {
         console.error("Error loading chat:", data.error);
         return;
       }
+
       if (data.messages) {
         setMessages(data.messages);
         setChatId(data.chatId);
@@ -116,7 +127,7 @@ export default function ChatPage() {
         if (data.chats) {
           const selectedChatId = data.chats[data.chats.length - 1]?.id;
           if (!selectedChatId) return;
-          handleChatSelect(selectedChatId);
+          await handleChatSelect(selectedChatId);
         }
       } catch (err) {
         console.error("Error fetching chats:", err);
@@ -125,6 +136,44 @@ export default function ChatPage() {
     [handleChatSelect]
   );
 
+  const fetchExistingConversation = useCallback(
+    async (chatId: number, threadId: string) => {
+      if (!company) {
+        console.error("Company configuration not found!");
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch("/api/assistantChat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userMessage: "",
+            chatId,
+            threadId,
+            openaiApiKey: company.openai_api_key,
+            assistantId: company.assistant_id,
+          }),
+        });
+        const data: AssistantResponse = await res.json();
+        if (!data.error && data.messages) {
+          setMessages(data.messages);
+          if (data.suggestions) {
+            setDynamicSuggestions(data.suggestions);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading conversation:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [company]
+  );
+
+  //--------------------------------------------------
+  // 3. Chat Actions
+  //--------------------------------------------------
   const handleNewChat = useCallback(() => {
     setChatId(null);
     setThreadId(null);
@@ -140,7 +189,9 @@ export default function ChatPage() {
       setLoading(true);
       setAssistantTyping(true);
 
+      // Add the user's message and clear the input
       setMessages((prev) => [...prev, { role: "INVESTOR", content: message }]);
+      setUserMessage("");
 
       try {
         if (!company) {
@@ -178,61 +229,60 @@ export default function ChatPage() {
       } finally {
         setLoading(false);
         setAssistantTyping(false);
-        setUserMessage("");
         setShowSuggestions(false);
       }
     },
     [company, userId, chatId, threadId]
   );
 
-  const fetchExistingConversation = useCallback(
-    async (chatId: number, threadId: string) => {
-      try {
-        if (!company) {
-          console.error("Company configuration not found!");
-          return;
-        }
+  function handleCloseChat() {
+    window.parent.postMessage({ type: "closeChat" }, "*");
+  }
 
-        setLoading(true);
-        const res = await fetch("/api/assistantChat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userMessage: "",
-            chatId,
-            threadId,
-            openaiApiKey: company.openai_api_key,
-            assistantId: company.assistant_id,
-          }),
-        });
-        const data: AssistantResponse = await res.json();
-        if (!data.error && data.messages) {
-          setMessages(data.messages);
-          if (data.suggestions) {
-            setDynamicSuggestions(data.suggestions);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading conversation:", err);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [company]
-  );
+  //--------------------------------------------------
+  // 4. Lifecycle / Effects
+  //--------------------------------------------------
 
+  // On mount: load or generate user ID
+  // Then decide how to load the chat
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
     if (storedUserId) {
       setUserId(storedUserId);
-      fetchUserChats(storedUserId);
     } else {
       const newUserId = uuidv4();
       localStorage.setItem("userId", newUserId);
       setUserId(newUserId);
     }
-  }, [fetchUserChats]);
+  }, []);
 
+  // Once we have userId, check if there's a stored chat
+  // If not, fetch the last user chat from the DB
+  useEffect(() => {
+    if (!userId) return;
+
+    const storedChatId = localStorage.getItem("chatId");
+    const storedThreadId = localStorage.getItem("threadId");
+
+    if (storedChatId) {
+      setChatId(Number(storedChatId));
+      if (storedThreadId) {
+        setThreadId(storedThreadId);
+      }
+    } else {
+      // No stored chat => load the user's last chat from DB
+      fetchUserChats(userId);
+    }
+  }, [userId, fetchUserChats]);
+
+  // Only fetch existing conversation once we have company + chatId + threadId
+  useEffect(() => {
+    if (company && chatId && threadId) {
+      fetchExistingConversation(chatId, threadId);
+    }
+  }, [company, chatId, threadId, fetchExistingConversation]);
+
+  // Listen for "fillInput" messages from parent embed
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (!event.data) return;
@@ -249,30 +299,17 @@ export default function ChatPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, [sendUserMessage, handleNewChat]);
 
-  useEffect(() => {
-    const storedChatId = localStorage.getItem("chatId");
-    const storedThreadId = localStorage.getItem("threadId");
-    if (storedChatId) setChatId(Number(storedChatId));
-    if (storedThreadId) setThreadId(storedThreadId);
-  }, []);
-
-  useEffect(() => {
-    if (chatId && threadId) {
-      fetchExistingConversation(chatId, threadId);
-    }
-  }, [chatId, threadId, fetchExistingConversation]);
-
+  // Scroll to bottom on messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  function handleCloseChat() {
-    window.parent.postMessage({ type: "closeChat" }, "*");
-  }
-
+  //--------------------------------------------------
+  // 5. Handlers
+  //--------------------------------------------------
   async function handleSend(e?: FormEvent) {
     if (e) e.preventDefault();
-    if (!userMessage.trim()) return;
+    if (loading || !userMessage.trim()) return;
     await sendUserMessage(userMessage);
   }
 
@@ -312,6 +349,9 @@ export default function ChatPage() {
       ? defaultSuggestions
       : [];
 
+  //--------------------------------------------------
+  // 6. Render
+  //--------------------------------------------------
   return (
     <div className={styles.chatPageContainer}>
       {/* Fixed Header */}
@@ -327,16 +367,25 @@ export default function ChatPage() {
       >
         <h1 className="text-lg font-semibold text-gray-800">AI IR Agent</h1>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={handleNewChat}>
-            New Chat
+          <Button
+            variant="ghost"
+            className="text-gray-600"
+            onClick={handleNewChat}
+          >
+            <Plus className="mr-1 h-5 w-5" />
+            New
           </Button>
-          <Button variant="ghost" onClick={handleCloseChat}>
+          <Button
+            variant="ghost"
+            className="text-gray-600"
+            onClick={handleCloseChat}
+          >
             X
           </Button>
         </div>
       </div>
 
-      {/* Chat Area (with top and bottom margins to avoid fixed header/footer) */}
+      {/* Chat area with margins to avoid overlap with fixed header/footer */}
       <div
         onScroll={handleScroll}
         className={styles.chatArea}
@@ -362,31 +411,27 @@ export default function ChatPage() {
           zIndex: 1000,
         }}
       >
-        {/* Suggestions */}
+        {/* Show suggestions if allowed and available */}
         {showSuggestions && suggestionsToShow.length > 0 && (
-          <div className={styles.suggestions}>
-            <AutoSuggestions
-              suggestions={suggestionsToShow}
-              onSelect={handleSuggestionClick}
-            />
-          </div>
+          <AutoSuggestions
+            suggestions={suggestionsToShow}
+            onSelect={handleSuggestionClick}
+          />
         )}
 
-        {/* Disclaimer */}
-        <div className={styles.disclaimer}>
-          <p>
+        <div className="flex justify-center px-3 py-2 border-gray-200 bg-gray-50">
+          <p className="text-sm text-gray-500 mb-2">
             This is not financial advice. Do your own due diligence.
           </p>
         </div>
 
-        {/* Input Area */}
+        {/* Input area */}
         <form onSubmit={handleSend} className={styles.inputArea}>
           <Input
             className={styles.inputField}
             placeholder="Type your message..."
             value={userMessage}
             onChange={handleInputChange}
-            disabled={loading}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
