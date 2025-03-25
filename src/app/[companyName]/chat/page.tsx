@@ -47,7 +47,7 @@ export default function ChatPage() {
     openai_api_key: string;
     assistant_id: string;
     default_suggestions: string[];
-  }>({ openai_api_key: '', assistant_id: '', default_suggestions: []});
+  } | null>(null);
 
   // State for controlling suggestions
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -65,6 +65,7 @@ export default function ChatPage() {
 
         if (error) throw error;
         
+        console.log(company);
         setCompany(company);
         if (company?.default_suggestions) {
           setDynamicSuggestions(company.default_suggestions);
@@ -107,8 +108,10 @@ export default function ChatPage() {
       });
       const data = await res.json();
       if (data.chats) {
+        const selectedChatId = data.chats[data.chats.length - 1]?.id;
+        if(!selectedChatId) return;
         // load content for last chat
-        handleChatSelect(data.chats[data.chats.length - 1]?.id)
+        handleChatSelect(selectedChatId)
       }
     } catch (err) {
       console.error("Error fetching chats:", err);
@@ -159,22 +162,20 @@ export default function ChatPage() {
     setShowSuggestions(true);
   }, []);
 
-  // Wrap sendUserMessage in useCallback to include it in dependencies
-  const sendUserMessage = useCallback(
-    async (message: string) => {
+  const sendUserMessage = async (message: string) => {
       if (!message.trim()) return;
       setLoading(true);
       setAssistantTyping(true);
 
       // Optimistically add the user's message
       setMessages((prev) => [...prev, { role: "INVESTOR", content: message }]);
-
-      if (!company) {
-        console.error("Company configuration not found!");
-        return;
-      }
       
       try {
+        if (!company) {
+          console.error("Company configuration not found!");
+          return;
+        }
+
         const res = await fetch("/api/assistantChat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -202,9 +203,7 @@ export default function ChatPage() {
         // Hide suggestions after sending a message
         setShowSuggestions(false);
       }
-    },
-    [chatId, threadId]
-  );
+  };
 
   // Listen for "fillInput" messages from parent embed
   useEffect(() => {
@@ -245,6 +244,11 @@ export default function ChatPage() {
 
   async function fetchExistingConversation(chatId: number, threadId: string) {
     try {
+      if (!company) {
+        console.error("Company configuration not found!");
+        return;
+      }
+
       setLoading(true);
       const res = await fetch("/api/assistantChat", {
         method: "POST",
