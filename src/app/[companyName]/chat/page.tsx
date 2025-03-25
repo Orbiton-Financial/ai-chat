@@ -21,6 +21,7 @@ import { AssistantResponse } from "./types/assistantResponse";
 import styles from "./styles.module.css";
 import { createClient } from "@supabase/supabase-js";
 import { useParams } from "next/navigation";
+import { trackEvent } from "@/lib/mixpanel";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -284,6 +285,13 @@ export default function ChatPage() {
       fetchExistingConversation(chatId, threadId);
     }
   }, [company, chatId, threadId, fetchExistingConversation]);
+
+  // Track an "Open Chat" event when the page loads (once we have a userId)
+  useEffect(() => {
+    if (userId) {
+      trackEvent("Chat Opened", { companyName, userId });
+    }
+  }, [userId, companyName]);
 
   // Listen for "fillInput" messages from parent embed
   useEffect(() => {

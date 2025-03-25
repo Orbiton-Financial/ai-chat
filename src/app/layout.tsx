@@ -1,5 +1,7 @@
 import './globals.css' // Import Tailwind here
 import type { Metadata } from 'next'
+import ClientMixpanelInitializer from '@/components/MixpanelInitializer' // Adjust path as needed
+
 
 export const metadata: Metadata = {
   title: 'Orbiton Ai Chatbot',
@@ -13,7 +15,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ClientMixpanelInitializer />
+        {children}
+      </body>
     </html>
   )
 }
