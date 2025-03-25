@@ -65,7 +65,6 @@ export default function ChatPage() {
 
         if (error) throw error;
         
-        console.log(company);
         setCompany(company);
         if (company?.default_suggestions) {
           setDynamicSuggestions(company.default_suggestions);
