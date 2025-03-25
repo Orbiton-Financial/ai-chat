@@ -15,7 +15,10 @@ export async function GET(request: Request) {
   .eq('name', companyName.toLowerCase())
   .single();
 
-  const chatUrl = company.chat_url;
+  const domain = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
+  const chatUrl = `${domain}/${companyName}/chat`;
+
+  console.log("This is the url:",chatUrl);
   const investUrl = company.invest_url;
   // const presetPrompts = company.preset_prompts ? JSON.parse(company.preset_prompts) : []; // Assuming `preset_prompts` is stored as a JSON string.
 
