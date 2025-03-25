@@ -456,6 +456,16 @@ export default function ChatPage() {
             {loading ? "Sending..." : "Send"}
           </Button>
         </form>
+
+          {/* Powered by Orbiton with Logo */}
+        <div className="flex items-center justify-center text-center text-xs text-gray-400 pt-2 pb-2 bg-white">
+          <span>Powered by </span>
+          <img
+            src="/orbiton.png"  // update with your logo path
+            alt="Orbiton Logo"
+            className="inline-block h-4 ml-1"
+          />
+        </div>
       </div>
     </div>
   );
