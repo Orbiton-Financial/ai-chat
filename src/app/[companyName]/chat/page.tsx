@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  FormEvent,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useRef, FormEvent, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -16,8 +10,8 @@ import { TypingIndicator } from "./components/TypingIndicator";
 import { ChatBubble } from "./components/ChatBubble";
 import { Message } from "./types/message";
 import { AssistantResponse } from "./types/assistantResponse";
-import styles from './styles.module.css';
-import { createClient } from '@supabase/supabase-js';
+import styles from "./styles.module.css";
+import { createClient } from "@supabase/supabase-js";
 import { useParams } from "next/navigation";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -39,7 +33,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [assistantTyping, setAssistantTyping] = useState(false);
   const params = useParams();
-  const companyName = params.companyName as string; 
+  const companyName = params.companyName as string;
   const [company, setCompany] = useState<{
     openai_api_key: string;
     assistant_id: string;
@@ -55,9 +49,9 @@ export default function ChatPage() {
     const fetchCompanyConfig = async () => {
       try {
         const { data: company, error } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('name', companyName.toLowerCase())
+          .from("companies")
+          .select("*")
+          .eq("name", companyName.toLowerCase())
           .single();
 
         if (error) throw error;
@@ -99,7 +93,7 @@ export default function ChatPage() {
       const data = await res.json();
       if (data.chats) {
         const selectedChatId = data.chats[data.chats.length - 1]?.id;
-        if(!selectedChatId) return;
+        if (!selectedChatId) return;
         handleChatSelect(selectedChatId);
       }
     } catch (err) {
@@ -125,7 +119,7 @@ export default function ChatPage() {
       }
       if (data.messages) {
         setMessages(data.messages);
-        setChatId(data.chatId); 
+        setChatId(data.chatId);
         setThreadId(data.threadId || null);
       }
     } catch (err) {
@@ -166,7 +160,7 @@ export default function ChatPage() {
           chatId,
           threadId,
           openaiApiKey: company?.openai_api_key,
-          assistantId: company?.assistant_id
+          assistantId: company?.assistant_id,
         }),
       });
       const data: AssistantResponse = await res.json();
@@ -215,12 +209,11 @@ export default function ChatPage() {
     if (storedThreadId) setThreadId(storedThreadId);
   }, []);
 
-  // Fetch existing conversation on mount if we have chatId/threadId/company
   useEffect(() => {
-    if (chatId && threadId && company) {
+    if (chatId && threadId) {
       fetchExistingConversation(chatId, threadId);
     }
-  }, [chatId, threadId, company]);
+  }, [chatId, threadId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -242,7 +235,7 @@ export default function ChatPage() {
           chatId,
           threadId,
           openaiApiKey: company.openai_api_key,
-          assistantId: company.assistant_id
+          assistantId: company.assistant_id,
         }),
       });
       const data: AssistantResponse = await res.json();
@@ -305,65 +298,93 @@ export default function ChatPage() {
       ? defaultSuggestions
       : [];
 
-      return (
-        <div className={styles.chatPageContainer}>
-          {/* Header */}
-          <div className={styles.header}>
-            <h1 className="text-lg font-semibold text-gray-800">AI IR Agent</h1>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={handleNewChat}>New</Button>
-              <Button variant="ghost" onClick={handleCloseChat}>X</Button>
-            </div>
-          </div>
-      
-          {/* Chat area (scrollable) */}
-          <div onScroll={handleScroll} className={styles.chatArea}>
-            {messages.map((msg, idx) => (
-              <ChatBubble key={idx} role={msg.role} content={msg.content} />
-            ))}
-            {assistantTyping && <ChatBubble role="AI AGENT" content={<TypingIndicator />} />}
-            <div ref={bottomRef} />
-          </div>
-      
-          {/* Footer pinned at bottom */}
-          <div className={styles.footer}>
-      
-            {/* Suggestions */}
-            {showSuggestions && suggestionsToShow.length > 0 && (
-              <div className={styles.suggestions}>
-                <AutoSuggestions suggestions={suggestionsToShow} onSelect={handleSuggestionClick} />
-              </div>
-            )}
-      
-            {/* Disclaimer */}
-            <div className={styles.disclaimer}>
-              <p>This is not financial advice. Do your own due diligence.</p>
-            </div>
-      
-            {/* Input area */}
-            <form onSubmit={handleSend} className={styles.inputArea}>
-              <Input
-                className={styles.inputField}
-                placeholder="Type your message..."
-                value={userMessage}
-                onChange={handleInputChange}
-                disabled={loading}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <Button
-                type="submit"
-                disabled={loading}
-                className={styles.sendButton}
-              >
-                {loading ? "Sending..." : "Send"}
-              </Button>
-            </form>
-          </div>
+  return (
+    <div className={styles.chatPageContainer}>
+      {/* Fixed Header */}
+      <div
+        className={styles.header}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+        }}
+      >
+        <h1 className="text-lg font-semibold text-gray-800">AI IR Agent</h1>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={handleNewChat}>
+            New Chat
+          </Button>
+          <Button variant="ghost" onClick={handleCloseChat}>
+            X
+          </Button>
         </div>
-      );
+      </div>
+
+      {/* Chat Area (with top and bottom margins to avoid fixed header/footer) */}
+      <div
+        onScroll={handleScroll}
+        className={styles.chatArea}
+        style={{ marginTop: "60px", marginBottom: "120px" }}
+      >
+        {messages.map((msg, idx) => (
+          <ChatBubble key={idx} role={msg.role} content={msg.content} />
+        ))}
+        {assistantTyping && (
+          <ChatBubble role="AI AGENT" content={<TypingIndicator />} />
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Fixed Footer */}
+      <div
+        className={styles.footer}
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+        }}
+      >
+        {/* Suggestions */}
+        {showSuggestions && suggestionsToShow.length > 0 && (
+          <div className={styles.suggestions}>
+            <AutoSuggestions
+              suggestions={suggestionsToShow}
+              onSelect={handleSuggestionClick}
+            />
+          </div>
+        )}
+
+        {/* Disclaimer */}
+        <div className={styles.disclaimer}>
+          <p>
+            This is not financial advice. Do your own due diligence.
+          </p>
+        </div>
+
+        {/* Input Area */}
+        <form onSubmit={handleSend} className={styles.inputArea}>
+          <Input
+            className={styles.inputField}
+            placeholder="Type your message..."
+            value={userMessage}
+            onChange={handleInputChange}
+            disabled={loading}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+          />
+          <Button type="submit" disabled={loading} className={styles.sendButton}>
+            {loading ? "Sending..." : "Send"}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
 }
