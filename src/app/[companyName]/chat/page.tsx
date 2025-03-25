@@ -1,9 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useRef, FormEvent, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  FormEvent,
+  useCallback,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { AutoSuggestions } from "./components/AutoSuggestions";
 import { TypingIndicator } from "./components/TypingIndicator";
@@ -55,7 +60,7 @@ export default function ChatPage() {
           .single();
 
         if (error) throw error;
-        
+
         setCompany(company);
         if (company?.default_suggestions) {
           setDynamicSuggestions(company.default_suggestions);
@@ -71,37 +76,7 @@ export default function ChatPage() {
     fetchCompanyConfig();
   }, [companyName]);
 
-  useEffect(() => {
-    const storedUserId = localStorage.getItem("userId");
-    if (storedUserId) {
-      setUserId(storedUserId);
-      fetchUserChats(storedUserId);
-    } else {
-      const newUserId = uuidv4();
-      localStorage.setItem("userId", newUserId);
-      setUserId(newUserId);
-    }
-  }, []);
-
-  async function fetchUserChats(userId: string) {
-    try {
-      const res = await fetch("/api/userChats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      if (data.chats) {
-        const selectedChatId = data.chats[data.chats.length - 1]?.id;
-        if (!selectedChatId) return;
-        handleChatSelect(selectedChatId);
-      }
-    } catch (err) {
-      console.error("Error fetching chats:", err);
-    }
-  }
-
-  async function handleChatSelect(chatId: number) {
+  const handleChatSelect = useCallback(async (chatId: number) => {
     setLoading(true);
     try {
       const res = await fetch("/api/loadChat", {
@@ -127,7 +102,28 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  const fetchUserChats = useCallback(
+    async (userId: string) => {
+      try {
+        const res = await fetch("/api/userChats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        const data = await res.json();
+        if (data.chats) {
+          const selectedChatId = data.chats[data.chats.length - 1]?.id;
+          if (!selectedChatId) return;
+          handleChatSelect(selectedChatId);
+        }
+      } catch (err) {
+        console.error("Error fetching chats:", err);
+      }
+    },
+    [handleChatSelect]
+  );
 
   const handleNewChat = useCallback(() => {
     setChatId(null);
@@ -138,53 +134,104 @@ export default function ChatPage() {
     setShowSuggestions(true);
   }, []);
 
-  const sendUserMessage = async (message: string) => {
-    if (!message.trim()) return;
-    setLoading(true);
-    setAssistantTyping(true);
+  const sendUserMessage = useCallback(
+    async (message: string) => {
+      if (!message.trim()) return;
+      setLoading(true);
+      setAssistantTyping(true);
 
-    setMessages((prev) => [...prev, { role: "INVESTOR", content: message }]);
-      
-    try {
-      if (!company) {
-        console.error("Company configuration not found!");
-        return;
-      }
+      setMessages((prev) => [...prev, { role: "INVESTOR", content: message }]);
 
-      const res = await fetch("/api/assistantChat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userMessage: message,
-          userId,
-          chatId,
-          threadId,
-          openaiApiKey: company?.openai_api_key,
-          assistantId: company?.assistant_id,
-        }),
-      });
-      const data: AssistantResponse = await res.json();
-
-      if (!data.error && data.messages) {
-        setMessages(data.messages);
-        if (data.chatId) {
-          setChatId(data.chatId);
-          localStorage.setItem("chatId", String(data.chatId));
+      try {
+        if (!company) {
+          console.error("Company configuration not found!");
+          return;
         }
-        if (data.threadId) {
-          setThreadId(data.threadId);
-          localStorage.setItem("threadId", data.threadId);
+
+        const res = await fetch("/api/assistantChat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userMessage: message,
+            userId,
+            chatId,
+            threadId,
+            openaiApiKey: company.openai_api_key,
+            assistantId: company.assistant_id,
+          }),
+        });
+        const data: AssistantResponse = await res.json();
+
+        if (!data.error && data.messages) {
+          setMessages(data.messages);
+          if (data.chatId) {
+            setChatId(data.chatId);
+            localStorage.setItem("chatId", String(data.chatId));
+          }
+          if (data.threadId) {
+            setThreadId(data.threadId);
+            localStorage.setItem("threadId", data.threadId);
+          }
         }
+      } catch (err) {
+        console.error("Error sending message:", err);
+      } finally {
+        setLoading(false);
+        setAssistantTyping(false);
+        setUserMessage("");
+        setShowSuggestions(false);
       }
-    } catch (err) {
-      console.error("Error sending message:", err);
-    } finally {
-      setLoading(false);
-      setAssistantTyping(false);
-      setUserMessage("");
-      setShowSuggestions(false);
+    },
+    [company, userId, chatId, threadId]
+  );
+
+  const fetchExistingConversation = useCallback(
+    async (chatId: number, threadId: string) => {
+      try {
+        if (!company) {
+          console.error("Company configuration not found!");
+          return;
+        }
+
+        setLoading(true);
+        const res = await fetch("/api/assistantChat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userMessage: "",
+            chatId,
+            threadId,
+            openaiApiKey: company.openai_api_key,
+            assistantId: company.assistant_id,
+          }),
+        });
+        const data: AssistantResponse = await res.json();
+        if (!data.error && data.messages) {
+          setMessages(data.messages);
+          if (data.suggestions) {
+            setDynamicSuggestions(data.suggestions);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading conversation:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [company]
+  );
+
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("userId");
+    if (storedUserId) {
+      setUserId(storedUserId);
+      fetchUserChats(storedUserId);
+    } else {
+      const newUserId = uuidv4();
+      localStorage.setItem("userId", newUserId);
+      setUserId(newUserId);
     }
-  };
+  }, [fetchUserChats]);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -213,44 +260,11 @@ export default function ChatPage() {
     if (chatId && threadId) {
       fetchExistingConversation(chatId, threadId);
     }
-  }, [chatId, threadId]);
+  }, [chatId, threadId, fetchExistingConversation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  async function fetchExistingConversation(chatId: number, threadId: string) {
-    try {
-      if (!company) {
-        console.error("Company configuration not found!");
-        return;
-      }
-
-      setLoading(true);
-      const res = await fetch("/api/assistantChat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userMessage: "",
-          chatId,
-          threadId,
-          openaiApiKey: company.openai_api_key,
-          assistantId: company.assistant_id,
-        }),
-      });
-      const data: AssistantResponse = await res.json();
-      if (!data.error && data.messages) {
-        setMessages(data.messages);
-        if (data.suggestions) {
-          setDynamicSuggestions(data.suggestions);
-        }
-      }
-    } catch (err) {
-      console.error("Error loading conversation:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function handleCloseChat() {
     window.parent.postMessage({ type: "closeChat" }, "*");
