@@ -215,11 +215,12 @@ export default function ChatPage() {
     if (storedThreadId) setThreadId(storedThreadId);
   }, []);
 
+  // Fetch existing conversation on mount if we have chatId/threadId/company
   useEffect(() => {
-    if (chatId && threadId) {
+    if (chatId && threadId && company) {
       fetchExistingConversation(chatId, threadId);
     }
-  }, [chatId, threadId]);
+  }, [chatId, threadId, company]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
