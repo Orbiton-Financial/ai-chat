@@ -338,9 +338,11 @@ export default function ChatPage() {
   }
 
   function handleSuggestionClick(suggestion: string) {
+    setShowSuggestions(false); // hide the suggestions section immediately
     setUserMessage(suggestion);
     sendUserMessage(suggestion);
-  }
+  }  
+  
 
   const suggestionsToShow =
     dynamicSuggestions.length > 0
