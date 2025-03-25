@@ -45,6 +45,7 @@ export default function ChatPage() {
   const companyName = params.companyName as string;
 
   const [company, setCompany] = useState<{
+    id: number,
     openai_api_key: string;
     assistant_id: string;
     default_suggestions: string[];
@@ -65,7 +66,7 @@ export default function ChatPage() {
         const { data: company, error } = await supabase
           .from("companies")
           .select("*")
-          .eq("name", companyName.toLowerCase())
+          .eq("name", companyName)
           .single();
 
         if (error) throw error;
@@ -151,6 +152,7 @@ export default function ChatPage() {
             userMessage: "",
             chatId,
             threadId,
+            companyId: company.id,
             openaiApiKey: company.openai_api_key,
             assistantId: company.assistant_id,
           }),
@@ -207,6 +209,7 @@ export default function ChatPage() {
             userId,
             chatId,
             threadId,
+            companyId: company.id,
             openaiApiKey: company.openai_api_key,
             assistantId: company.assistant_id,
           }),

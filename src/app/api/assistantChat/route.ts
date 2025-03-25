@@ -12,7 +12,7 @@ export type MappedMessage = {
 export async function POST(request: Request) {
   try {
     // Extract the request data
-    const { userMessage, threadId, chatId: incomingChatId, userId, openaiApiKey, assistantId } = await request.json();
+    const { userMessage, threadId, chatId: incomingChatId, userId, companyId, openaiApiKey, assistantId } = await request.json();
 
     // Validate if both API Key and Assistant ID are present in the request
     if (!openaiApiKey || !assistantId) {
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     if (!chatId && userMessage) {
       const { data: newChat, error: chatError } = await supabase
         .from('chats')
-        .insert([{ title: userMessage, user_id: userId }])
+        .insert([{ title: userMessage, user_id: userId, company_id: companyId }])
         .select('*')
         .single();
       if (chatError) throw chatError;
