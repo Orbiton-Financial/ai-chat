@@ -28,7 +28,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const defaultSuggestions = [
-  "Recentt drill results?",
+  "Recent drill results?",
   "Upcoming catalysts?",
   "Accretive acquisitions?",
 ];
