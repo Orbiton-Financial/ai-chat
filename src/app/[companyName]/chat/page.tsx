@@ -67,7 +67,7 @@ export default function ChatPage() {
         const { data: company, error } = await supabase
           .from("companies")
           .select("*")
-          .eq("name", companyName)
+          .eq("name", companyName.toLocaleLowerCase())
           .single();
 
         if (error) throw error;
@@ -123,7 +123,7 @@ export default function ChatPage() {
         const res = await fetch("/api/userChats", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ userId, companyId: company?.id }),
         });
         const data = await res.json();
         if (data.chats) {
@@ -264,6 +264,7 @@ export default function ChatPage() {
   // If not, fetch the last user chat from the DB
   useEffect(() => {
     if (!userId) return;
+    if (!company) return;
 
     const storedChatId = localStorage.getItem("chatId");
     const storedThreadId = localStorage.getItem("threadId");
@@ -277,7 +278,7 @@ export default function ChatPage() {
       // No stored chat => load the user's last chat from DB
       fetchUserChats(userId);
     }
-  }, [userId, fetchUserChats]);
+  }, [userId, company, fetchUserChats]);
 
   // Only fetch existing conversation once we have company + chatId + threadId
   useEffect(() => {
