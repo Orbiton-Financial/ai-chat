@@ -454,7 +454,6 @@ export async function GET(request: Request) {
 
   var presetPrompts = [
     "What makes you different?",
-    "Recent drill results?"
   ];
 
   presetPrompts.forEach(function(prompt) {
