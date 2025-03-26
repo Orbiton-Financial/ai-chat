@@ -9,11 +9,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await request.json();
+    const { userId, companyId } = await request.json();
     const { data: chats, error } = await supabase
       .from('chats')
       .select('id, title')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('company_id', companyId);
 
     if (error) throw error;
     return NextResponse.json({ chats }, { status: 200 });
