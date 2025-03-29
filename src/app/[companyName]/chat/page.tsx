@@ -22,13 +22,14 @@ import styles from "./styles.module.css";
 import { createClient } from "@supabase/supabase-js";
 import { useParams } from "next/navigation";
 import { trackEvent } from "@/lib/mixpanel";
+import PopUp from "./components/PopUp";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const defaultSuggestions = [
-  "Recentt drill results?",
+  "Recent drill results?",
   "Upcoming catalysts?",
   "Accretive acquisitions?",
 ];
@@ -41,6 +42,13 @@ export default function ChatPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [assistantTyping, setAssistantTyping] = useState(false);
+
+  // Pop up values
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState("");
+  const [showLanguagePopup, setShowLanguagePopup] = useState(false);
+
+
 
   const params = useParams();
   const companyName = params.companyName as string;
@@ -322,8 +330,25 @@ export default function ChatPage() {
   async function handleSend(e?: FormEvent) {
     if (e) e.preventDefault();
     if (loading || !userMessage.trim()) return;
+  
+    // For the very first message when terms haven't been accepted,
+    // start loading the response immediately while showing the full-screen popup.
+    if (!hasAcceptedTerms && messages.length === 0) {
+      sendUserMessage(userMessage); // Begin loading the response immediately.
+      setUserMessage("");
+      setShowLanguagePopup(true);   // Show the modal overlay until terms are accepted.
+      return;
+    }
     await sendUserMessage(userMessage);
   }
+  
+  function handleLanguageSelection(language: string) {
+    // Optionally store the language, mark terms as accepted, and remove the popup.
+    localStorage.setItem("selectedLanguage", language);
+    setHasAcceptedTerms(true);
+    setShowLanguagePopup(false);
+  }
+  
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
@@ -368,6 +393,11 @@ export default function ChatPage() {
   //--------------------------------------------------
   return (
     <div className={styles.chatPageContainer}>
+      {/* Pop Up Hnalder  */}
+      {showLanguagePopup && (
+      <PopUp onContinue={handleLanguageSelection} />
+      )}
+
       {/* Fixed Header */}
       <div
         className={styles.header}
@@ -379,6 +409,7 @@ export default function ChatPage() {
           zIndex: 1000,
         }}
       >
+        
         <h1 className="text-lg font-semibold text-gray-800">AI IR Agent</h1>
         <div className="flex items-center gap-2">
           <Button
